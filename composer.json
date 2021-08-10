@@ -1,0 +1,56 @@
+{
+  "name": "pollen-solutions/wp-kernel",
+    "description": "Pollen Solutions - Wordpress Kernel Component - Basic tools for building a web application based on Wordpress and the Pollen Solutions component suite.",
+  "homepage": "https://www.presstify.com/pollen-solutions/wp-kernel/",
+  "keywords": [
+    "pollen-solutions",
+    "component",
+    "wordpress",
+    "kernel"
+  ],
+  "time": "2021-08-10",
+  "license": "MIT",
+  "authors": [
+    {
+      "name": "Jordy Manner",
+      "email": "jordy@presstify.com"
+    }
+  ],
+  "require": {
+    "php": "^7.4 || ^8.0",
+    "pollen-solutions/kernel": "^1.0",
+    "pollen-solutions/wp-env": "^1.0"
+  },
+  "require-dev": {
+    "phpunit/phpunit": "^9.0",
+    "roave/security-advisories": "dev-latest"
+  },
+  "autoload": {
+    "files": [
+      "src/helpers.php"
+    ],
+    "psr-4": {
+      "Pollen\\WpKernel\\": "src"
+    }
+  },
+  "autoload-dev": {
+    "psr-4": {
+      "Pollen\\WpKernel\\Test\\": "tests"
+    }
+  },
+  "suggest": {
+    "pollen-solutions/container" : "Pollen Solutions - Container Component - PSR-11 ready Dependencies Injection Container.",
+    "pollen-solutions/field" : "Pollen Solutions - Field Component - Collection of form fields.",
+    "pollen-solutions/partial" : "Pollen Solutions - Partial Component - Collection of web user interfaces.",
+    "pollen-solutions/wp-post" : "Pollen Solutions - Wordpress Post Component.",
+    "pollen-solutions/wp-term" : "Pollen Solutions - Wordpress Term Component.",
+    "pollen-solutions/wp-user" : "Pollen Solutions - Wordpress User Component."
+  },
+  "minimum-stability": "dev",
+  "prefer-stable": true,
+  "config": {
+    "optimize-autoloader": true,
+    "preferred-install": "dist",
+    "sort-packages": true
+  }
+}
