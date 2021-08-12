@@ -6,8 +6,8 @@ namespace Pollen\WpKernel;
 
 use Pollen\Database\DatabaseManagerInterface;
 use Pollen\Support\Proxy\ContainerProxy;
-use Pollen\WpDb\WpDb;
-use Pollen\WpDb\WpDbInterface;
+use Pollen\WpDatabase\WpDatabase as BaseWpDatabase;
+use Pollen\WpDatabase\WpDatabaseInterface;
 use Psr\Container\ContainerInterface as Container;
 
 class WpDatabase
@@ -15,7 +15,7 @@ class WpDatabase
     use ContainerProxy;
 
     /**
-     * Databoase Manager instance.
+     * Database Manager instance.
      * @var DatabaseManagerInterface $db
      */
     protected DatabaseManagerInterface $db;
@@ -29,6 +29,8 @@ class WpDatabase
         $this->db = $db;
         $this->setContainer($container);
 
-        $this->containerAdd(WpDbInterface::class, new WpDb([], $this->getContainer()), true);
+        if (class_exists(BaseWpDatabase::class)) {
+            $this->containerAdd(WpDatabaseInterface::class, new BaseWpDatabase([], $this->getContainer()), true);
+        }
     }
 }
