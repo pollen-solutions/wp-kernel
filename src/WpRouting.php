@@ -44,6 +44,7 @@ class WpRouting
         'is_feed',
         'is_comment_feed',
         'is_trackback',
+        'is_front_page',
         'is_home',
         'is_404',
         'is_embed',
@@ -107,7 +108,8 @@ class WpRouting
 
                         $this->router->setCurrentRoute($route);
 
-                        /*if ($hook = $this->wpHooker()->getRouteHookable($route)) {
+                        /* @todo * /
+                         if ($hook = $this->wpHooker()->getRouteHookable($route)) {
                             add_action(
                                 'pre_get_posts',
                                 function (WP_Query $wp_query) use ($hook) {
@@ -117,7 +119,8 @@ class WpRouting
                                 },
                                 0
                             );
-                        } else { */
+                        } else {
+                        /**/
                         add_action(
                             'pre_get_posts',
                             function (WP_Query $wp_query) {
@@ -170,7 +173,7 @@ class WpRouting
 
                 $this->router->sendResponse($response);
                 $this->router->terminateEvent($request, $response);
-                /* * /
+                /* @todo * /
                 if (wp_using_themes() && $request->isMethod('GET')) {
                     if (config('routing.remove_trailing_slash', true)) {
                         $permalinks = get_option('permalink_structure');

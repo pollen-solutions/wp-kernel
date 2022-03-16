@@ -8,6 +8,7 @@ use League\Route\Http\Exception\HttpExceptionInterface as BaseHttpExceptionInter
 use League\Route\Http\Exception\NotFoundException as BaseNotFoundException;
 use Pollen\Http\Response;
 use Pollen\Http\ResponseInterface;
+use Pollen\Kernel\ApplicationInterface;
 use Pollen\Support\ProxyResolver;
 use Pollen\Support\Str;
 use Pollen\Routing\BaseViewController;
@@ -94,10 +95,25 @@ class WpFallbackController extends BaseViewController
             return $response;
         }
 
+        $hasTag = false;
         foreach (array_keys($this->wpTemplateTags) as $tag) {
-            if ($tag() && ($response = $this->handleTag($tag, ...$args))) {
+            $tagged = $tag();
+
+            if (!$hasTag && $tagged) {
+                $hasTag = true;
+            }
+
+            if (
+                $tagged
+                && ($template = $this->handleTagTemplate($tag, ...$args))
+                && ($response = $this->handleTemplateResponse($template))
+            ) {
                 return $response;
             }
+        }
+
+        if ($hasTag && ($response = $this->handleTemplateResponse())) {
+            return $reponse;
         }
 
         $response = $this->afterDispatch(...$args);
@@ -105,7 +121,10 @@ class WpFallbackController extends BaseViewController
             return $response;
         }
 
-        if (!$response = $this->handleTag('is_404', ...$args)) {
+        if (
+            !($template = $this->handleTagTemplate('is_404', ...$args))
+            || !($response = $this->handleTemplateResponse($template))
+        ) {
             $response = $this->response('Template unavailable', 404);
         }
 
@@ -146,9 +165,9 @@ class WpFallbackController extends BaseViewController
      * @param string $tag
      * @param ...$args
      *
-     * @return ResponseInterface|null
+     * @return string|null
      */
-    public function handleTag(string $tag, ...$args): ?ResponseInterface
+    public function handleTagTemplate(string $tag, ...$args): ?string
     {
         if (!function_exists('apply_filters')) {
             throw new WpRuntimeException('apply_filters function is missing.');
@@ -164,13 +183,30 @@ class WpFallbackController extends BaseViewController
             if ('attachment' === $tag) {
                 remove_filter('the_content', 'prepend_attachment');
             }
-        } else {
+        }
+
+       return $template ? $template : null;
+    }
+
+    /**
+     * Handle HTTP request for Wordpress template response.
+     *
+     * @param string|null $template
+     *
+     * @return ResponseInterface|null
+     */
+    public function handleTemplateResponse(?string $template = null): ?ResponseInterface
+    {
+        if ($template === null) {
             $template = get_index_template();
         }
 
         if ($template = apply_filters('template_include', $template)) {
+            /** @var ApplicationInterface $app */
+            $app = $this->getContainer()->get(ApplicationInterface::class);
+
             $template = preg_replace(
-                '#' . preg_quote(get_template_directory(), DIRECTORY_SEPARATOR) . '#',
+                '#' . preg_quote($app->getPublicPath(), DIRECTORY_SEPARATOR) . '#',
                 '',
                 $template
             );
@@ -185,10 +221,12 @@ class WpFallbackController extends BaseViewController
                 );
             }
             $view = $viewManager->createView('plates')
-                 ->setDirectory(get_template_directory())
-                 ->setFileExtension('php');
+                ->setDirectory($app->getPublicPath())
+                ->setFileExtension('php');
 
-            return $this->response($view->render(pathinfo($template, PATHINFO_FILENAME)));
+            return $this->response($view->render(
+                pathinfo($template, PATHINFO_DIRNAME) . '/' . pathinfo($template, PATHINFO_FILENAME))
+            );
         }
         return null;
     }
