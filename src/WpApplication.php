@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Pollen\WpKernel;
 
+use Dotenv\Dotenv;
 use Pollen\Asset\AssetManagerInterface;
 use Pollen\Cookie\CookieJarInterface;
 use Pollen\Database\DatabaseManagerInterface;
@@ -48,8 +49,6 @@ class WpApplication extends Application implements WpApplicationInterface
     {
         if ($this->preBuilt === false) {
             parent::preBuild();
-
-            new WpEnv($this->basePath);
 
             $this->preBuilt = true;
         }
@@ -146,7 +145,9 @@ class WpApplication extends Application implements WpApplicationInterface
      */
     protected function envLoad(): void
     {
-        Env::load($this->getBasePath())->required(['DB_DATABASE', 'DB_USERNAME', 'DB_PASSWORD', 'DB_HOST']);
+        $loader = (new WpEnv($this->getBasePath()))->load();
+
+        $loader->required(['DB_DATABASE', 'DB_USERNAME', 'DB_PASSWORD', 'DB_HOST']);
     }
 
     /**
