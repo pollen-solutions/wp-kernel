@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace Pollen\WpKernel;
+namespace Pollen\WpKernel\Components\Routing;
 
 use League\Route\Http\Exception\HttpExceptionInterface as BaseHttpExceptionInterface;
 use League\Route\Http\Exception\NotFoundException as BaseNotFoundException;
@@ -22,7 +22,7 @@ use RuntimeException;
 class WpFallbackController extends BaseViewController
 {
     /**
-     * Map list of conditional tags for Worpress template.
+     * Map list of conditional tags for Wordpress template.
      * @see ./wp-includes/template-loader.php
      * @var array<string, string>
      */
@@ -91,6 +91,7 @@ class WpFallbackController extends BaseViewController
         $args = func_get_args();
 
         $response = $this->beforeDispatch(...$args);
+
         if ($response instanceof ResponseInterface) {
             return $response;
         }
@@ -113,7 +114,7 @@ class WpFallbackController extends BaseViewController
         }
 
         if ($hasTag && ($response = $this->handleTemplateResponse())) {
-            return $reponse;
+            return $response;
         }
 
         $response = $this->afterDispatch(...$args);
@@ -179,13 +180,13 @@ class WpFallbackController extends BaseViewController
             return $this->{$method}(...$args);
         }
 
-        if ($template = call_user_func($this->wpTemplateTags[$tag])) {
-            if ('attachment' === $tag) {
+        $template = call_user_func($this->wpTemplateTags[$tag]);
+
+        if ($template && ('attachment' === $tag)) {
                 remove_filter('the_content', 'prepend_attachment');
-            }
         }
 
-       return $template ? $template : null;
+        return $template ?: null;
     }
 
     /**
@@ -197,6 +198,10 @@ class WpFallbackController extends BaseViewController
      */
     public function handleTemplateResponse(?string $template = null): ?ResponseInterface
     {
+        if (!function_exists('apply_filters')) {
+            throw new WpRuntimeException('apply_filters function is missing.');
+        }
+
         if ($template === null) {
             $template = get_index_template();
         }

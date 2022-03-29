@@ -29,6 +29,8 @@ class WpFaker
 
         global $locale;
 
-        $this->faker->setLocale($locale);
+        if ($locale) {
+            $this->faker->setLocale($locale);
+        }
     }
 }
