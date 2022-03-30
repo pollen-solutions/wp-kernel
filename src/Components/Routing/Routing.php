@@ -33,6 +33,11 @@ class Routing
 
         $this->setContainer($container);
 
+        $permalinks = get_option('permalink_structure');
+        if (($permalinks === '') || substr($permalinks, -1) === '/') {
+            $router->setBaseSuffix('/');
+        }
+
         if (is_multisite()) {
             $router->setBasePrefix(get_blog_details()->path);
         }
