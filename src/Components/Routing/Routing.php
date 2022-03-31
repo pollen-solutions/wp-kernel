@@ -31,6 +31,10 @@ class Routing
             throw new WpRuntimeException('add_action function is missing.');
         }
 
+        if (defined('WP_INSTALLING') && WP_INSTALLING === true) {
+            return;
+        }
+
         $this->setContainer($container);
 
         $permalinks = get_option('permalink_structure');
