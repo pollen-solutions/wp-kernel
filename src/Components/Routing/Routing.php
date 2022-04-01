@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Pollen\WpKernel\Components\Routing;
 
 use Pollen\Kernel\Http\HttpKernelInterface;
+use Pollen\Routing\UrlMatcher;
 use Pollen\Support\Proxy\ContainerProxy;
 use Pollen\Routing\RouterInterface;
 use Pollen\WpKernel\Exception\WpRuntimeException;
@@ -23,6 +24,10 @@ class Routing
      */
     public function __construct(RouterInterface $router, Container $container)
     {
+        if (defined('WP_INSTALLING') && WP_INSTALLING === true) {
+            return;
+        }
+
         if (!function_exists('is_admin')) {
             throw new WpRuntimeException('is_admin function is missing.');
         }
@@ -31,8 +36,8 @@ class Routing
             throw new WpRuntimeException('add_action function is missing.');
         }
 
-        if (defined('WP_INSTALLING') && WP_INSTALLING === true) {
-            return;
+        if (!function_exists('get_option')) {
+            throw new WpRuntimeException('add_action function is missing.');
         }
 
         $this->setContainer($container);
@@ -50,16 +55,21 @@ class Routing
             $router->setFallback(new WpFallbackController($container));
         }
 
-//        if (is_admin()) {
-//            add_action(
-//                'admin_init',
-//                function () {
-//                    $request = $this->httpRequest();
-//                    $urlMatcher = new UrlMatcher($this->router, $request);
-//                    $urlMatcher->match();
-//                }
-//            );
-//        }
+        if (is_admin()) {
+            add_action(
+                'admin_init',
+                function () use ($container, $router) {
+                    try {
+                        /** @var ServerRequestInterface $request */
+                        $request = $container->get(ServerRequestInterface::class);
+
+                        (new UrlMatcher($router))->handle($request);
+                    } catch (NotFoundExceptionInterface|ContainerExceptionInterface $e) {
+                        unset($e);
+                    }
+                }
+            );
+        }
 
         add_action(
             'template_redirect',
@@ -85,30 +95,3 @@ class Routing
         );
     }
 }
-
-/* @todo * /
-if (wp_using_themes() && $request->isMethod('GET')) {
-    if (config('routing.remove_trailing_slash', true)) {
-        $permalinks = get_option('permalink_structure');
-        if (substr($permalinks, -1) == '/') {
-            update_option('permalink_structure', rtrim($permalinks, '/'));
-        }
-
-        $path = Request::getBaseUrl() . Request::getPathInfo();
-
-        if (($path != '/') && (substr($path, -1) == '/')) {
-            $dispatcher = new Dispatcher($this->manager->getData());
-            $match = $dispatcher->dispatch($method, rtrim($path, '/'));
-
-            if ($match[0] === FastRoute::FOUND) {
-                $redirect_url = rtrim($path, '/');
-                $redirect_url .= ($qs = Request::getQueryString()) ? "?{$qs}" : '';
-
-                $response = HttpRedirect::createPsr($redirect_url);
-                $this->manager->emit($response);
-                exit;
-            }
-        }
-    }
-}
-/**/

@@ -17,6 +17,8 @@ use Pollen\Routing\Exception\NotFoundException;
 use Pollen\View\ViewManager;
 use Pollen\View\ViewManagerInterface;
 use Pollen\WpKernel\Exception\WpRuntimeException;
+use Psr\Container\ContainerExceptionInterface;
+use Psr\Container\NotFoundExceptionInterface;
 use RuntimeException;
 
 class WpFallbackController extends BaseViewController
@@ -64,7 +66,7 @@ class WpFallbackController extends BaseViewController
      *
      * @return ResponseInterface|null
      */
-    public function afterDispatch(...$args): ?ResponseInterface
+    protected function afterDispatch(...$args): ?ResponseInterface
     {
         return null;
     }
@@ -76,7 +78,7 @@ class WpFallbackController extends BaseViewController
      *
      * @return ResponseInterface|null
      */
-    public function beforeDispatch(...$args): ?ResponseInterface
+    protected function beforeDispatch(...$args): ?ResponseInterface
     {
         return null;
     }
@@ -86,7 +88,7 @@ class WpFallbackController extends BaseViewController
      *
      * @return ResponseInterface
      */
-    public function dispatch(): ResponseInterface
+    protected function dispatch(): ResponseInterface
     {
         $args = func_get_args();
 
@@ -96,8 +98,21 @@ class WpFallbackController extends BaseViewController
             return $response;
         }
 
+        $tags = array_keys($this->wpTemplateTags);
+
+        foreach ($tags as $tag) {
+            $method = Str::camel($tag);
+
+            if (
+                method_exists($this, $method)
+                && ($response = $this->{$method}(...$args)) instanceof ResponseInterface
+            ) {
+                return $response;
+            }
+        }
+
         $hasTag = false;
-        foreach (array_keys($this->wpTemplateTags) as $tag) {
+        foreach ($tags as $tag) {
             $tagged = $tag();
 
             if (!$hasTag && $tagged) {
@@ -106,7 +121,7 @@ class WpFallbackController extends BaseViewController
 
             if (
                 $tagged
-                && ($template = $this->handleTagTemplate($tag, ...$args))
+                && ($template = $this->handleTagTemplate($tag))
                 && ($response = $this->handleTemplateResponse($template))
             ) {
                 return $response;
@@ -123,7 +138,7 @@ class WpFallbackController extends BaseViewController
         }
 
         if (
-            !($template = $this->handleTagTemplate('is_404', ...$args))
+            !($template = $this->handleTagTemplate('is_404'))
             || !($response = $this->handleTemplateResponse($template))
         ) {
             $response = $this->response('Template unavailable', 404);
@@ -140,7 +155,7 @@ class WpFallbackController extends BaseViewController
      *
      * @return ResponseInterface
      */
-    public function exceptionRender(BaseHttpExceptionInterface $e, ...$args): ResponseInterface
+    protected function exceptionRender(BaseHttpExceptionInterface $e, ...$args): ResponseInterface
     {
         if ($e instanceof NotFoundException || $e instanceof BaseNotFoundException) {
             return $this->dispatch(...$args);
@@ -161,23 +176,16 @@ class WpFallbackController extends BaseViewController
     }
 
     /**
-     * Handle HTTP request for conditionnal tag of Wordpress Template.
+     * Handle HTTP requests for conditional tag of WordPress Template.
      *
      * @param string $tag
-     * @param ...$args
      *
      * @return string|null
      */
-    public function handleTagTemplate(string $tag, ...$args): ?string
+    protected function handleTagTemplate(string $tag): ?string
     {
         if (!function_exists('apply_filters')) {
             throw new WpRuntimeException('apply_filters function is missing.');
-        }
-
-        $method = Str::camel($tag);
-
-        if (method_exists($this, $method)) {
-            return $this->{$method}(...$args);
         }
 
         $template = call_user_func($this->wpTemplateTags[$tag]);
@@ -190,13 +198,13 @@ class WpFallbackController extends BaseViewController
     }
 
     /**
-     * Handle HTTP request for Wordpress template response.
+     * Handle HTTP requests for WordPress template response.
      *
      * @param string|null $template
      *
      * @return ResponseInterface|null
      */
-    public function handleTemplateResponse(?string $template = null): ?ResponseInterface
+    protected function handleTemplateResponse(?string $template = null): ?ResponseInterface
     {
         if (!function_exists('apply_filters')) {
             throw new WpRuntimeException('apply_filters function is missing.');
@@ -207,32 +215,71 @@ class WpFallbackController extends BaseViewController
         }
 
         if ($template = apply_filters('template_include', $template)) {
-            /** @var ApplicationInterface $app */
-            $app = $this->getContainer()->get(ApplicationInterface::class);
+            if ($container = $this->getContainer()) {
+                try {
+                    /** @var ApplicationInterface $app */
+                    $app = $container->get(ApplicationInterface::class);
+                } catch (NotFoundExceptionInterface|ContainerExceptionInterface $e) {
+                    throw new RuntimeException('Application', 0, $e);
+                }
 
-            $template = preg_replace(
-                '#' . preg_quote($app->getPublicPath(), DIRECTORY_SEPARATOR) . '#',
-                '',
-                $template
-            );
+                $template = preg_replace(
+                    '#' . preg_quote($app->getPublicPath(), DIRECTORY_SEPARATOR) . '#',
+                    '',
+                    $template
+                );
 
-            try {
-                $viewManager = ViewManager::getInstance();
-            } catch (RuntimeException $e) {
-                $viewManager = ProxyResolver::getInstance(
-                    ViewManagerInterface::class,
-                    ViewManager::class,
-                    method_exists($this, 'getContainer') ? $this->getContainer() : null
+                try {
+                    $viewManager = ViewManager::getInstance();
+                } catch (RuntimeException $e) {
+                    $viewManager = ProxyResolver::getInstance(
+                        ViewManagerInterface::class,
+                        ViewManager::class,
+                        method_exists($this, 'getContainer') ? $this->getContainer() : null
+                    );
+                }
+                $view = $viewManager->createView('plates')
+                    ->setDirectory($app->getPublicPath())
+                    ->setFileExtension('php');
+
+                return $this->response($view->render(
+                    pathinfo($template, PATHINFO_DIRNAME) . '/' . pathinfo($template, PATHINFO_FILENAME))
                 );
             }
-            $view = $viewManager->createView('plates')
-                ->setDirectory($app->getPublicPath())
-                ->setFileExtension('php');
 
-            return $this->response($view->render(
-                pathinfo($template, PATHINFO_DIRNAME) . '/' . pathinfo($template, PATHINFO_FILENAME))
-            );
+            ob_start();
+            include $template;
+            $content = ob_get_clean();
+
+            return $this->response($content);
         }
         return null;
     }
 }
+
+/* @todo * /
+ * if (wp_using_themes() && $request->isMethod('GET')) {
+ * if (config('routing.remove_trailing_slash', true)) {
+ * $permalinks = get_option('permalink_structure');
+ * if (substr($permalinks, -1) == '/') {
+ * update_option('permalink_structure', rtrim($permalinks, '/'));
+ * }
+ *
+ * $path = Request::getBaseUrl() . Request::getPathInfo();
+ *
+ * if (($path != '/') && (substr($path, -1) == '/')) {
+ * $dispatcher = new Dispatcher($this->manager->getData());
+ * $match = $dispatcher->dispatch($method, rtrim($path, '/'));
+ *
+ * if ($match[0] === FastRoute::FOUND) {
+ * $redirect_url = rtrim($path, '/');
+ * $redirect_url .= ($qs = Request::getQueryString()) ? "?{$qs}" : '';
+ *
+ * $response = HttpRedirect::createPsr($redirect_url);
+ * $this->manager->emit($response);
+ * exit;
+ * }
+ * }
+ * }
+ * }
+ * /**/
