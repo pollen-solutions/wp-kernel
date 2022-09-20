@@ -30,7 +30,7 @@
       "src/helpers.php"
     ],
     "psr-4": {
-      "Pollen\\WpKernel\\": "src"
+      "Pollen\\WpKernel\\": ["src", "src/deprecated"]
     }
   },
   "autoload-dev": {
