@@ -18,4 +18,10 @@ use Pollen\WpUser\WpUserManagerInterface;
  */
 interface WpApplicationInterface extends ApplicationInterface
 {
+    /**
+     * Gets DB table prefix.
+     *
+     * @return string|null
+     */
+    public function getTablePrefix(): ?string;
 }

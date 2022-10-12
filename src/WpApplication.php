@@ -16,6 +16,19 @@ use Pollen\WpKernel\Exception\WpRuntimeException;
 class WpApplication extends Application implements WpApplicationInterface
 {
     /**
+     * @var WpEnv
+     */
+    private $wpEnv;
+
+    /**
+     * @return WpEnv
+     */
+    private function wpEnv(): WpEnv
+    {
+        return $this->wpEnv ?? new WpEnv($this->getBasePath());
+    }
+
+    /**
      * @return void
      */
     protected function preBuildEvents(): void
@@ -46,8 +59,16 @@ class WpApplication extends Application implements WpApplicationInterface
      */
     protected function envLoad(): void
     {
-        $loader = (new WpEnv($this->getBasePath()))->load();
+        $loader = $this->wpEnv()->load();
 
         $loader->required(['DB_DATABASE', 'DB_USERNAME', 'DB_PASSWORD', 'DB_HOST']);
+    }
+
+    /**
+     * @inheritDoc
+     */
+    public function getTablePrefix(): ?string
+    {
+        return $this->wpEnv()->getTablePrefix();
     }
 }
