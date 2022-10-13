@@ -4,11 +4,16 @@ declare(strict_types=1);
 
 namespace Pollen\WpKernel\Components\Routing;
 
+use FastRoute\Dispatcher;
+use FastRoute\Dispatcher\GroupCountBased;
 use League\Route\Http\Exception\HttpExceptionInterface as BaseHttpExceptionInterface;
 use League\Route\Http\Exception\NotFoundException as BaseNotFoundException;
+use League\Route\Route;
+use League\Route\RouteConditionHandlerInterface;
 use Pollen\Http\Response;
 use Pollen\Http\ResponseInterface;
 use Pollen\Kernel\ApplicationInterface;
+use Pollen\Support\Proxy\HttpRequestProxy;
 use Pollen\Support\ProxyResolver;
 use Pollen\Support\Str;
 use Pollen\Routing\BaseViewController;
@@ -119,6 +124,31 @@ class WpFallbackController extends BaseViewController
                 $hasTag = true;
             }
 
+            if ($tagged && $tag === 'is_404') {
+                if (wp_using_themes() && $this->httpRequest()->isMethod('GET')) {
+                    $path = $this->httpRequest()->getBaseUrl() . $this->httpRequest()->getPathInfo();
+                    $permalinks = get_option('permalink_structure');
+                    $normalizedPath = null;
+
+                    if (substr($permalinks, -1) === '/' && substr($path, -1) !== '/') {
+                        $normalizedPath = $path . '/';
+                    } else if(substr($permalinks, -1) !== '/' && substr($path, -1) === '/') {
+                        $normalizedPath = rtrim($path . '/');
+                    }
+
+                    if ($normalizedPath !== null) {
+                        $routeCollector = $this->router()->getRouteCollector();
+                        $data = $routeCollector->getRoutesData();
+
+                        $match = (new GroupCountBased($data))->dispatch('GET', $normalizedPath);
+
+                        if ($match[0] === Dispatcher::FOUND) {
+                            return $this->redirect($normalizedPath);
+                        }
+                    }
+                }
+            }
+
             if (
                 $tagged
                 && ($template = $this->handleTagTemplate($tag))
@@ -191,7 +221,7 @@ class WpFallbackController extends BaseViewController
         $template = call_user_func($this->wpTemplateTags[$tag]);
 
         if ($template && ('attachment' === $tag)) {
-                remove_filter('the_content', 'prepend_attachment');
+            remove_filter('the_content', 'prepend_attachment');
         }
 
         return $template ?: null;
@@ -257,29 +287,4 @@ class WpFallbackController extends BaseViewController
     }
 }
 
-/* @todo * /
- * if (wp_using_themes() && $request->isMethod('GET')) {
- * if (config('routing.remove_trailing_slash', true)) {
- * $permalinks = get_option('permalink_structure');
- * if (substr($permalinks, -1) == '/') {
- * update_option('permalink_structure', rtrim($permalinks, '/'));
- * }
- *
- * $path = Request::getBaseUrl() . Request::getPathInfo();
- *
- * if (($path != '/') && (substr($path, -1) == '/')) {
- * $dispatcher = new Dispatcher($this->manager->getData());
- * $match = $dispatcher->dispatch($method, rtrim($path, '/'));
- *
- * if ($match[0] === FastRoute::FOUND) {
- * $redirect_url = rtrim($path, '/');
- * $redirect_url .= ($qs = Request::getQueryString()) ? "?{$qs}" : '';
- *
- * $response = HttpRedirect::createPsr($redirect_url);
- * $this->manager->emit($response);
- * exit;
- * }
- * }
- * }
- * }
- * /**/
+
