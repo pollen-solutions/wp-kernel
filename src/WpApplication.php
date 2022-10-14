@@ -7,6 +7,8 @@ namespace Pollen\WpKernel;
 use Pollen\Console\ConsoleInterface;
 use Pollen\Event\EventDispatcherInterface;
 use Pollen\Kernel\Application;
+use Pollen\Kernel\Events\ConfigLoadedEvent;
+use Pollen\Kernel\Events\ConfigLoadEvent;
 use Pollen\Routing\RouterInterface;
 use Pollen\WpEnv\WpEnv;
 use Pollen\WpKernel\Components\Console\Console;
@@ -49,6 +51,18 @@ class WpApplication extends Application implements WpApplicationInterface
                     new Routing($router, $this);
                 }
             });
+        }
+    }
+
+    /**
+     * @param EventDispatcherInterface $eventDispatcher
+     *
+     * @return void
+     */
+    protected function buildConfig(EventDispatcherInterface $eventDispatcher): void
+    {
+        if (!defined('WP_INSTALLING') || WP_INSTALLING !== true) {
+            parent::buildConfig($eventDispatcher);
         }
     }
 
