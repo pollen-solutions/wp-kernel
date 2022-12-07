@@ -109,6 +109,7 @@ class WpFallbackController extends BaseViewController
             $method = Str::camel($tag);
 
             if (
+                $tag() &&
                 method_exists($this, $method)
                 && ($response = $this->{$method}(...$args)) instanceof ResponseInterface
             ) {
