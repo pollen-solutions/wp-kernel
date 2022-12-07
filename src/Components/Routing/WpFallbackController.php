@@ -106,24 +106,8 @@ class WpFallbackController extends BaseViewController
         $tags = array_keys($this->wpTemplateTags);
 
         foreach ($tags as $tag) {
-            $method = Str::camel($tag);
-
-            if (
-                $tag() &&
-                method_exists($this, $method)
-                && ($response = $this->{$method}(...$args)) instanceof ResponseInterface
-            ) {
-                return $response;
-            }
-        }
-
-        $hasTag = false;
-        foreach ($tags as $tag) {
             $tagged = $tag();
-
-            if (!$hasTag && $tagged) {
-                $hasTag = true;
-            }
+            $method = Str::camel($tag);
 
             if ($tagged && $tag === 'is_404') {
                 if (wp_using_themes() && $this->httpRequest()->isMethod('GET')) {
@@ -148,6 +132,23 @@ class WpFallbackController extends BaseViewController
                         }
                     }
                 }
+            }
+
+            if (
+                $tagged &&
+                method_exists($this, $method)
+                && ($response = $this->{$method}(...$args)) instanceof ResponseInterface
+            ) {
+                return $response;
+            }
+        }
+
+        $hasTag = false;
+        foreach ($tags as $tag) {
+            $tagged = $tag();
+
+            if (!$hasTag && $tagged) {
+                $hasTag = true;
             }
 
             if (
